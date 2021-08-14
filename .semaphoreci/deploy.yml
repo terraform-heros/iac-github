@@ -1,0 +1,34 @@
+version: v1.0
+name: "Deploy to GitHub"
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu1804
+
+global_job_config:
+  env_vars:
+    - name: BUILD_TOOLS_VERSION
+      value: v0.1.2
+    - name: TF_IN_AUTOMATION
+      value: "yes"
+    - name: TERRAFORM_PLANFILE
+      value: "out.tfplan"
+  secrets:
+    - name: github_access_token
+    - name: aws_access_credentials
+  prologue:
+    commands:
+      - checkout --use-cache
+
+blocks:
+  - name: "Deploy"
+    task:
+      prologue:
+        commands:
+          - cache restore terraform-wd-$SEMAPHORE_GIT_BRANCH
+          - cache restore terraform-planfile-$SEMAPHORE_GIT_BRANCH
+      jobs:
+        - name: "Terraform Apply"
+          commands:
+            - make terraform-apply
+            - cache clear

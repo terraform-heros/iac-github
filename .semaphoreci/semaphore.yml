@@ -1,0 +1,44 @@
+version: v1.0
+name: "IaC-Github CI Pipeline"
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu1804
+
+global_job_config:
+  env_vars:
+    - name: BUILD_TOOLS_VERSION
+      value: v0.1.2
+    - name: TF_IN_AUTOMATION
+      value: "yes"
+    - name: TERRAFORM_PLANFILE
+      value: "out.tfplan"
+  secrets:
+    - name: github_access_token
+    - name: aws_access_credentials
+  prologue:
+    commands:
+      - checkout --use-cache
+
+blocks:
+  - name: "Lint and Plan"
+    task:
+      prologue:
+        commands:
+          - cache clear
+      jobs:
+        - name: "Pre Commit Hooks"
+          commands:
+            - make pre-commit-hooks
+        - name: "Terraform Plan"
+          commands:
+            - make terraform-init
+            - make terraform-plan
+            - cache store terraform-wd-$SEMAPHORE_GIT_BRANCH .terraform
+            - cache store terraform-planfile-$SEMAPHORE_GIT_BRANCH $TERRAFORM_PLANFILE
+
+promotions:
+  - name: "IaC-Github Deploy to GitHub"
+    pipeline_file: deploy.yml
+    auto_promote:
+      when: "branch = 'master'"
